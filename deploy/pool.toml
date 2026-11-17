@@ -1,0 +1,132 @@
+# vram-pool config. Copy to ~/.config/vram-pool/pool.toml (`vram-pool --init` does it).
+# The devices and backends below are an example layout. Replace them with your own hosts, ports
+# and key paths. Keys are read from key files or fetched over ssh into memory only. They are never
+# logged, never written and never shown by /pool/status.
+
+[server]
+# Loopback only. 0.0.0.0, ::, and any non-loopback address are refused at startup.
+bind = "127.0.0.1:8100"
+health_interval_s = 5      # a dead backend flips to DOWN within this many seconds
+memory_interval_s = 10
+probe_timeout_s = 3
+connect_timeout_s = 3
+request_timeout_s = 120    # wait for response headers; non-streaming replies send headers last
+stream_idle_timeout_s = 60 # cut a stream that goes silent this long
+max_attempts = 3           # backends tried per request, each at most once
+breaker_failures = 3       # consecutive failures that open a circuit
+breaker_open_s = 20        # first open period; doubles on a failed half-open trial
+breaker_max_open_s = 120
+metrics = true
+
+[fleet_studio]
+# Read-only status plus the one allowed write: a slot swap on Fleet Studio host rtx4080.
+url = "http://127.0.0.1:18090"
+
+[swap]
+enabled = true
+ctx = 8192
+vram_factor = 1.15   # Fleet Studio's own preflight numbers
+overhead_gib = 0.6
+reserve_mib = 1536  # VRAM that must stay free after a swap, for other GPU users and the desktop
+timeout_s = 330
+cooldown_s = 120
+
+# Aliases list equivalent models in preference order. A request for any member falls back to the
+# others when none of the first choice is healthy.
+[[alias]]
+name = "qwen3.5-2b"
+models = ["small-chat-qwen3.5-2b", "qwen3.5-2b"]
+
+[[alias]]
+name = "qwen3.5-9b"
+models = ["mac-qwen3.5-9b"]
+
+# ---- devices ----
+
+[[device]]
+id = "workstation"
+label = "GPU workstation"
+kind = "gpu"
+memory = { source = "nvidia-smi", note = "real nvidia-smi; every backend on this GPU shares it" }
+
+[[device]]
+id = "mac"
+label = "Mac with unified memory"
+kind = "unified"
+memory = { source = "ssh-macos", ssh = "mac-host", note = "unified memory; read-only sysctl hw.memsize + memory_pressure over ssh, using the ssh alias mac-host" }
+
+[[device]]
+id = "laptop"
+label = "Laptop"
+kind = "gpu"
+# No size is configured because none is measured in this example.
+memory = { source = "none", note = "set source = \"static\" and total_mib once the laptop is measured" }
+
+[[device]]
+id = "cluster"
+label = "Two-node cluster"
+kind = "cluster"
+memory = { source = "static", total_mib = 249090, note = "example: 2 x 124545 MiB, one figure per node" }
+
+# ---- backends ----
+
+[[backend]]
+id = "small-chat"
+device = "workstation"
+url = "http://127.0.0.1:8845"
+role = "chat"
+engine = "llama.cpp (CUDA)"
+key_file = "~/.config/small-chat/api-key"
+
+[[backend]]
+id = "slot-4080"
+device = "workstation"
+url = "http://127.0.0.1:8846"
+role = "slot"
+engine = "llama.cpp (CUDA), hot-swap slot managed by Fleet Studio"
+key_file = "~/.config/fleet-studio/slot-key"
+fleet_host = "rtx4080"
+
+[[backend]]
+id = "decision-a"
+device = "workstation"
+url = "http://127.0.0.1:8098"
+role = "decision"
+engine = "small classifier (transformers, nf4)"
+note = "decision model; listed, never given chat traffic"
+
+[[backend]]
+id = "decision-gateway"
+device = "workstation"
+url = "http://127.0.0.1:8097"
+role = "decision"
+engine = "decision gateway"
+models_source = "health-model"
+note = "decision gateway; listed, never given chat traffic"
+
+[[backend]]
+id = "mac-resident"
+device = "mac"
+# 192.0.2.0/24 is a documentation range. Use the address your Mac listens on.
+url = "http://192.0.2.10:8011"
+role = "chat"
+engine = "llama.cpp (Metal)"
+key_ssh = { host = "mac-host", path = "/path/to/llama-server/api-key" }
+
+[[backend]]
+id = "laptop-qwen"
+device = "laptop"
+url = "http://192.0.2.20:8742"
+role = "chat"
+engine = "llama.cpp"
+models = ["qwen3.5-2b"]
+note = "example: llama-server listens on the laptop's loopback, so reaching it needs a rebind to a LAN address or an ssh tunnel"
+
+[[backend]]
+id = "cluster"
+device = "cluster"
+url = "http://127.0.0.1:8080"
+role = "chat"
+engine = "TensorFold/vLLM TP2 behind a local proxy"
+explain_via_fleet = "cluster"
+note = "front door of the two-node cluster; recovers by itself when the engine serves again"

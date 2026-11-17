@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VRAM Pool</title>
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/status.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <span class="plate" id="plate" aria-hidden="true"></span>
+    <h1>VRAM Pool</h1>
+    <span class="endpoint" id="endpoint">http://127.0.0.1:8100/v1</span>
+  </div>
+  <div class="chip" id="conn" role="status"><span class="dot"></span><span class="word">connecting</span></div>
+</header>
+
+<main class="rack">
+  <section class="unit total" aria-labelledby="t-h">
+    <h2 id="t-h">Pooled memory</h2>
+    <div class="display" id="t-free">--</div>
+    <div class="sub" id="t-sub">waiting for the first answer</div>
+    <div class="meter" id="t-meter" role="img" aria-label="pooled memory used"><i></i></div>
+    <div class="facts">
+      <div><span class="k">devices up</span><span class="v" id="t-up">--</span></div>
+      <div><span class="k">configured</span><span class="v" id="t-conf">--</span></div>
+      <div><span class="k">hot swaps</span><span class="v" id="t-swap">--</span></div>
+    </div>
+  </section>
+  <div id="devices" class="devices"></div>
+  <section class="unit models" aria-labelledby="m-h">
+    <h2 id="m-h">Models</h2>
+    <div class="scroll"><table id="models"><thead><tr>
+      <th>Model</th><th>Device</th><th>Where</th><th class="num">Context</th><th>State</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+<script src="/status.js"></script>
+</body>
+</html>

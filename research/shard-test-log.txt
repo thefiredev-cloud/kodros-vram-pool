@@ -1,0 +1,28 @@
+Raw output of the 2026-10-21 shard test. llama.cpp b11081 (commit 161755f29). Model Qwen3.5-9B-Q4_K_M.gguf.
+Lines of loader noise (ggml_metal_*, load_backend:) removed. Nothing else edited.
+
+== Mac alone, run on the Mac: llama-bench -ngl 99 -p 128 -n 64 -r 3 (Mac load averages 2.52 9.07 14.38 before, 3.63 8.88 14.18 after)
+| model                          |       size |     params | backend    | threads |            test |                  t/s |
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | MTL,BLAS   |       8 |           pp128 |        321.98 ± 5.55 |
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | MTL,BLAS   |       8 |            tg64 |         36.36 ± 0.69 |
+
+== Workstation client, RPC to the Mac through ssh -L 127.0.0.1:50052 (CUDA_VISIBLE_DEVICES= so no 4080; "failed to initialize CUDA: no CUDA-capable device is detected")
+== llama-bench -ngl 99 --rpc 127.0.0.1:50052 -p 128 -n 64 -r 2     started 17:07:03, ended 17:10:37
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | CUDA,RPC   |  99 |           pp128 |       253.28 ± 19.56 |
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | CUDA,RPC   |  99 |            tg64 |          9.66 ± 1.23 |
+
+== llama-bench -ngl 20 --rpc 127.0.0.1:50052 -p 128 -n 64 -r 2     started 17:10:55, ended 17:13:46
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | CUDA,RPC   |  20 |           pp128 |         14.76 ± 1.79 |
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | CUDA,RPC   |  20 |            tg64 |          1.70 ± 0.37 |
+
+== llama-bench -ngl 0 -p 128 -n 32 -r 2 (CPU only on the workstation)    ended 17:15:42
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | CUDA       |   0 |           pp128 |          9.22 ± 0.18 |
+| qwen35 9B Q4_K - Medium        |   5.28 GiB |     8.95 B | CUDA       |   0 |            tg32 |          0.95 ± 0.10 |
+
+The backend column lists the backends the binary loaded ("CUDA"), not a device used: CUDA found no device in these runs.
+
+== 4080 compute apps at 17:10:55
+1667 small-chat llama-server 1848 MiB; 1605 stt 5088 MiB; 1593 classifier 2306 MiB; 967242 ComfyUI 238 MiB; 1146711 gpu-screen-recorder 540 MiB
+== free VRAM over 60 samples (first 17:01:57, 10 s apart, about 10 minutes): min 584 MiB, max 1656 MiB
+
+== cleanup verified 17:16: no listener on 50052 on the workstation or the Mac; Mac resident llama-server pid 1039 still running
