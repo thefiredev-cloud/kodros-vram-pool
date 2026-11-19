@@ -4,6 +4,13 @@ One OpenAI-compatible endpoint on `127.0.0.1` in front of every machine in a sma
 
 Part of the [Kodros](https://kodros.ai) local AI stack.
 
+## On your hardware
+
+- Does: puts one endpoint in front of every machine you own that has GPU memory. Clients ask for a model by name and do not need to know which machine serves it.
+- Needs: Rust 1.88 to build. The pool itself needs no GPU. You need at least one OpenAI-compatible server behind it (the example uses llama.cpp on CUDA and on Metal). It reads free memory from `nvidia-smi` on NVIDIA hosts, from `sysctl` and `memory_pressure` over SSH on Macs, or from a figure you set for clusters. It has run as a user service on one Linux desktop with an RTX 4080.
+- Stays on-prem: it listens on `127.0.0.1` only and refuses any other address, so it serves clients on its own machine unless you add forwarding. The example config points only at loopback and private addresses. No cloud backend is configured.
+- Models: it routes by model name. The example config uses Qwen names as placeholders (Qwen is China-origin). Replace them with the models you run, such as Llama, Gemma or gpt-oss.
+
 ## How it works
 
 ```mermaid
