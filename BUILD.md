@@ -4,7 +4,7 @@
 
 - Rust 1.88 or newer (edition 2024), with `cargo`.
 - At least one OpenAI-compatible backend to point it at, such as `llama-server` on a GPU machine.
-- Linux with systemd if you want the user service. The binary itself builds on any platform Rust supports.
+- A Unix target (Linux or macOS). `src/main.rs` installs a SIGTERM handler through `tokio::signal::unix`, which tokio compiles only on Unix, so a Windows build fails. systemd is needed only for the user service.
 
 ## Build
 
