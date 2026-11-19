@@ -18,12 +18,54 @@ use vram_pool::config::Config;
 use vram_pool::probe;
 use vram_pool::state::Pool;
 
+/// First port the allocator hands out. The range stops below the Linux ephemeral floor (32768),
+/// so the pool's own outbound sockets never take one of these numbers.
+const PORT_BASE: u16 = 20000;
+const PORT_SPAN: u16 = 8000;
+
+/// Ports come from a per-process monotonic counter. The old version bound `:0`, read the assigned
+/// port and dropped the listener; the kernel could hand the same number to the next call, so two
+/// tests running in parallel got one port and the second `bind` failed with `AddrInUse`.
+static NEXT_PORT: AtomicU16 = AtomicU16::new(0);
+
 pub fn free_port() -> u16 {
+    // Stagger the start per process so parallel test binaries do not walk the same range.
+    let offset = std::process::id() as u16 % PORT_SPAN;
+    for _ in 0..PORT_SPAN {
+        let n = NEXT_PORT.fetch_add(1, Ordering::Relaxed);
+        let candidate = PORT_BASE + offset.wrapping_add(n) % PORT_SPAN;
+        if std::net::TcpListener::bind(("127.0.0.1", candidate)).is_ok() {
+            return candidate;
+        }
+    }
+    // Every candidate was taken: fall back to an OS-assigned port.
     std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
         .unwrap()
         .port()
+}
+
+/// Binds a loopback port, retrying briefly on `AddrInUse`. A fake stopped with `abort()` may not
+/// have dropped its listener yet when the same port is bound again.
+async fn bind_loopback(port: u16) -> tokio::net::TcpListener {
+    let mut last = None;
+    for _ in 0..50 {
+        match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+            Ok(listener) => return listener,
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::AddrInUse {
+                    panic!("bind 127.0.0.1:{port}: {e}");
+                }
+                last = Some(e);
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+    }
+    panic!(
+        "bind 127.0.0.1:{port}: {}",
+        last.map(|e| e.to_string()).unwrap_or_default()
+    );
 }
 
 /// A llama.cpp-shaped fake: /health, /v1/models, chat (plain and SSE), embeddings.
@@ -82,9 +124,7 @@ impl Fake {
                 },
             ))
             .with_state(f.clone());
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
-            .await
-            .unwrap();
+        let listener = bind_loopback(port).await;
         let h = tokio::spawn(async move {
             let _ = axum::serve(listener, app).await;
         });
@@ -205,9 +245,7 @@ impl FakeFleet {
             .route("/api/status", get(fleet_status))
             .route("/api/hosts/{host}/slot/swap", post(fleet_swap))
             .with_state(f.clone());
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", f.port))
-            .await
-            .unwrap();
+        let listener = bind_loopback(f.port).await;
         *f.handle.lock().unwrap() = Some(tokio::spawn(async move {
             let _ = axum::serve(listener, app).await;
         }));
@@ -304,9 +342,7 @@ pub async fn start_pool(toml_text: &str) -> Harness {
     let pool = Pool::new(cfg).unwrap();
     probe::probe_all_once(&pool).await;
     probe::spawn_loops(&pool);
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
-        .await
-        .unwrap();
+    let listener = bind_loopback(port).await;
     let p = pool.clone();
     tokio::spawn(async move {
         let _ = vram_pool::serve(p, listener, std::future::pending()).await;
