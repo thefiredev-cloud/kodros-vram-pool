@@ -17,6 +17,8 @@ flowchart LR
   R -->|model missing, fits| F[Fleet Studio: load into swap slot]
 ```
 
+Static diagram: [docs/architecture.svg](docs/architecture.svg). Step-by-step build: [BUILD.md](BUILD.md).
+
 The router ranks healthy backends that list the requested model and streams the reply back unbuffered. A backend that fails before the first byte is replaced by the next one, up to 3 tries. Each backend has a circuit breaker. Every reply carries `x-vram-pool-device`, `x-vram-pool-backend` and `x-vram-pool-attempts` headers so you can see where it ran.
 
 ## Stack

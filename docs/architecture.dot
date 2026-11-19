@@ -1,0 +1,19 @@
+digraph "kodros-vram-pool architecture" {
+  rankdir=TB; bgcolor="white"; pad=0.3; nodesep=0.45; ranksep=0.7;
+  node [shape=box, style="rounded,filled", fillcolor="#f6f6f8", color="#c9c9d1", fontname="Helvetica,Arial,sans-serif", fontsize=12, fontcolor="#1b1b1f", margin="0.18,0.1", penwidth=1.4];
+  edge [color="#5c5c66", fontname="Helvetica,Arial,sans-serif", fontsize=10, fontcolor="#5c5c66", arrowsize=0.8];
+  cli [label="Client\nagent, editor, app"];
+  pool [label="vram-pool\n127.0.0.1:8100", color="#c2410c", penwidth=2.2, fillcolor="#fff7ed"];
+  r [label="Router\nrank by in-flight, latency, tok/s"];
+  b1 [label="GPU desktop\nllama-server"];
+  b2 [label="Mac\nllama-server"];
+  b3 [label="GB10 cluster\nOpenAI endpoint"];
+  fs [label="Fleet Studio\nload into swap slot"];
+  cli -> pool [label="OpenAI API"];
+  pool -> r [];
+  r -> b1 [];
+  r -> b2 [];
+  r -> b3 [];
+  pool -> b1 [label="health 5 s, memory 10 s", style="dashed"];
+  r -> fs [label="model missing, fits", style="dashed"];
+}

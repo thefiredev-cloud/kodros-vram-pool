@@ -1,6 +1,6 @@
 [Unit]
 Description=vram-pool: one OpenAI-compatible endpoint over every device's VRAM (127.0.0.1:8100)
-Documentation=https://github.com/thefiredev-cloud/vram-pool
+Documentation=https://github.com/thefiredev-cloud/kodros-vram-pool
 After=network-online.target
 
 [Service]
